@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colour (ColorScheme seed in lib/src/ui/app.dart). Also what the
+         app switcher shows in place of a screenshot while FLAG_SECURE is on:
+         Android draws the task's background colour and nothing else. -->
+    <color name="tamis_brand">#FF6D5DF6</color>
+</resources>

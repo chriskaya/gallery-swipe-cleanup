@@ -25,10 +25,11 @@ Normative source for the tuning constants in `lib/src/ui/swipe_gesture.dart`.
 | Tilt | ±12° at one card-width of travel, pivot below the card |
 | Spring back | stiffness 420, damping 24, starting at finger speed |
 | Throw | continues the finger speed, 140–320 ms |
-| Delete in batch mode | card shrinks into the batch badge (380 ms), badge bumps |
+| Delete in batch mode | card keeps travelling sideways then drops into the batch button, bottom of the delete side (420 ms, quadratic curve); badge bumps |
 | Delete in immediate mode | card shrinks into the delete button |
 | Threshold feedback | stamp becomes opaque and pops, medium haptic; lighter tick when backing off |
-| Undo | card comes back from the side (or badge) it left through |
+| Undo | card comes back from the side (or badge) it left through; no verdict stamp while it travels |
+| Spring back | never shows the opposite stamp, even on overshoot |
 | Reduced motion | honours the system setting: short fades, no throws |
 | Preload | the next card is rendered behind the current one (preview decoded), and grows into place while dragging |
 | Preview size | 2048 px on the long side (thumbnails 384 px) |

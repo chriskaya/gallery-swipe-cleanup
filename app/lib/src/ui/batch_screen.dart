@@ -140,9 +140,13 @@ class _Tile extends StatelessWidget {
               top: 4,
               right: 4,
               child: CircleAvatar(
-                radius: 14,
+                radius: 15,
                 backgroundColor: Colors.black54,
-                child: Icon(Icons.undo_rounded, size: 16, color: kKeepColor),
+                child: Icon(
+                  Icons.restore_from_trash_rounded,
+                  size: 18,
+                  color: kKeepColor,
+                ),
               ),
             ),
           ],

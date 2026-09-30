@@ -178,7 +178,9 @@ void main() {
       await h.session.start();
       final victim = h.ready.current;
       await h.session.decide(victim, Verdict.delete);
+      final before = h.emissions;
       await h.session.removeFromBatch(victim.id);
+      expect(h.emissions, greaterThan(before), reason: 'UI must be told');
       expect(h.batch.isEmpty, isTrue);
       expect(h.ready.canUndo, isFalse);
     });

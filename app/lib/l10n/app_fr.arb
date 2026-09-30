@@ -48,15 +48,15 @@
   "modeDirectHint": "Chaque swipe « supprimer » met l'élément à la corbeille tout de suite.",
   "manageMediaWarning": "Sans l'accès « Gestion des médias », Android demande une confirmation à chaque suppression.",
   "manageMediaTitle": "Accès « Gestion des médias »",
-  "manageMediaGranted": "Accordé : aucune confirmation lors de la mise à la corbeille.",
-  "manageMediaNotGranted": "Non accordé : Android demande confirmation à chaque mise à la corbeille.",
+  "manageMediaGranted": "Accordé : aucune confirmation lors de la mise à la corbeille. Touchez pour révoquer.",
+  "manageMediaNotGranted": "Non accordé : Android demande confirmation à chaque mise à la corbeille. Touchez pour autoriser.",
   "manageMediaGrant": "Autoriser",
   "sectionVideo": "Vidéos",
   "autoplay": "Lecture automatique des vidéos",
   "startMuted": "Démarrer sans le son",
   "sectionPrivacy": "Confidentialité",
   "hideInRecents": "Masquer dans les apps récentes",
-  "hideInRecentsHint": "Masque l'aperçu de l'app dans le sélecteur d'applications et bloque les captures d'écran.",
+  "hideInRecentsHint": "Affiche une carte unie aux couleurs de Tamis dans le sélecteur d'applications au lieu de vos photos, et bloque les captures d'écran.",
   "offlineTitle": "Aucun accès Internet",
   "offlineHint": "L'app n'a pas la permission réseau : vos photos ne quittent jamais l'appareil.",
   "sectionAbout": "À propos",
@@ -64,5 +64,6 @@
   "permissionTitle": "Accès à votre galerie",
   "permissionBody": "Tamis vous montre vos photos et vidéos une par une pour décider lesquelles garder. Rien ne quitte votre téléphone : l'app n'a pas accès à Internet.",
   "permissionGrant": "Autoriser l'accès",
-  "permissionOpenSettings": "Ouvrir les réglages de l'app"
+  "permissionOpenSettings": "Ouvrir les réglages de l'app",
+  "manageMediaManage": "Gérer"
 }

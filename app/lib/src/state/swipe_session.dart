@@ -267,6 +267,9 @@ class SwipeSession {
   Future<void> removeFromBatch(String id) => _serial(() async {
     await _batch.remove(id);
     _history.removeWhere((d) => d.item.id == id && !d.trashed);
+    // Always notify: _fill only emits when it has a card to draw, and the
+    // batch screen must rebuild regardless.
+    _emit();
     await _fill();
   });
 

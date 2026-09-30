@@ -16,7 +16,6 @@ import 'l10n.dart';
 import 'providers.dart';
 import 'settings_screen.dart';
 import 'widgets/action_bar.dart';
-import 'widgets/batch_button.dart';
 import 'widgets/media_view.dart';
 import 'widgets/swipeable_card.dart';
 import 'widgets/verdict_overlay.dart';
@@ -112,14 +111,7 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _TopBar(
-              filter: settings.filter,
-              total: total,
-              showBatch:
-                  settings.deletionMode == DeletionMode.batch || pending > 0,
-              pending: pending,
-              batchIconKey: _batchIconKey,
-            ),
+            _TopBar(filter: settings.filter, total: total),
             if (limited) const _LimitedAccessBanner(),
             Expanded(
               child: Padding(
@@ -142,6 +134,13 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               enabled: session is SessionReady,
               canUndo: canUndo,
               deleteButtonKey: _deleteButtonKey,
+              batchIconKey: _batchIconKey,
+              showBatch:
+                  settings.deletionMode == DeletionMode.batch || pending > 0,
+              pending: pending,
+              onOpenBatch: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const BatchScreen()),
+              ),
               onSwipe: (side) => unawaited(_card.swipe(side)),
               onUndo: () =>
                   unawaited(ref.read(sessionProvider.notifier).undo()),
@@ -225,19 +224,10 @@ class _CardFrame extends StatelessWidget {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({
-    required this.filter,
-    required this.total,
-    required this.showBatch,
-    required this.pending,
-    required this.batchIconKey,
-  });
+  const _TopBar({required this.filter, required this.total});
 
   final MediaFilter filter;
   final int? total;
-  final bool showBatch;
-  final int pending;
-  final GlobalKey batchIconKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -270,14 +260,6 @@ class _TopBar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
-          if (showBatch)
-            BatchButton(
-              count: pending,
-              targetKey: batchIconKey,
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const BatchScreen()),
-              ),
-            ),
           IconButton(
             tooltip: l10n.settingsTitle,
             icon: const Icon(Icons.tune_rounded),

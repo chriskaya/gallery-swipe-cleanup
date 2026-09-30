@@ -168,10 +168,63 @@ void main() {
     await swipe(tester, -350);
     await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
     await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Keep this item'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Keep this item'));
     await tester.pumpAndSettle();
     expect(app.container.read(sessionProvider.notifier).pendingItems, isEmpty);
     expect(app.library.trashRequests, 0);
+    // The grid itself must update, not just the session.
+    expect(find.bySemanticsLabel('Keep this item'), findsNothing);
+    expect(find.textContaining('The batch is empty'), findsOneWidget);
+  });
+
+  testWidgets('no verdict stamp flashes while an undone card comes back', (
+    tester,
+  ) async {
+    final app = appWith(12);
+    await app.pump(tester);
+    await swipe(tester, -350);
+    await tester.tap(find.byTooltip('Undo'));
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.text('KEEP'), findsNothing);
+      expect(find.text('DELETE'), findsNothing);
+    }
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('no opposite stamp during spring back', (tester) async {
+    final app = appWith(12);
+    await app.pump(tester);
+    final gesture = await tester.startGesture(tester.getCenter(card));
+    await gesture.moveBy(const Offset(20, 0));
+    await gesture.moveBy(const Offset(60, 0));
+    await tester.pump();
+    await gesture.up();
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.text('DELETE'), findsNothing);
+    }
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the batch button sits at the bottom of the delete side', (
+    tester,
+  ) async {
+    final app = appWith(12);
+    await app.pump(tester);
+    final batch = tester.getCenter(find.byIcon(Icons.delete_sweep_rounded));
+    final delete = tester.getCenter(find.bySemanticsLabel('Delete'));
+    final keep = tester.getCenter(find.bySemanticsLabel('Keep'));
+    expect(batch.dx, lessThan(delete.dx));
+    expect(batch.dy, greaterThan(tester.getRect(card).bottom));
+
+    await app.container
+        .read(settingsProvider.notifier)
+        .update((s) => s.copyWith(swipeDirection: SwipeDirection.leftKeeps));
+    await tester.pumpAndSettle();
+    final batch2 = tester.getCenter(find.byIcon(Icons.delete_sweep_rounded));
+    expect(batch2.dx, greaterThan(keep.dx));
   });
 
   testWidgets('empty gallery shows the empty state', (tester) async {

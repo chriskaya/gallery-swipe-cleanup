@@ -6,6 +6,10 @@ updates:
       interval: weekly
     commit-message:
       prefix: "build(deps)"
+    ignore:
+      # Pinned by flutter_localizations for a given Flutter SDK: bumped with
+      # the toolchain, never on its own (pub get fails otherwise).
+      - dependency-name: intl
     groups:
       pub:
         patterns: ["*"]

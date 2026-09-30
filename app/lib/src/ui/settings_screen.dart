@@ -37,13 +37,14 @@ class SettingsScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: SegmentedButton<SwipeDirection>(
               segments: [
-                ButtonSegment(
-                  value: SwipeDirection.rightKeeps,
-                  label: Text(l10n.directionRightKeeps),
-                ),
+                // Left option on the left, right option on the right.
                 ButtonSegment(
                   value: SwipeDirection.leftKeeps,
                   label: Text(l10n.directionLeftKeeps),
+                ),
+                ButtonSegment(
+                  value: SwipeDirection.rightKeeps,
+                  label: Text(l10n.directionRightKeeps),
                 ),
               ],
               selected: {settings.swipeDirection},
@@ -84,6 +85,8 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           if (manageMedia != null && manageMedia.supported)
+            // Tapping anywhere opens the system page, where the access can be
+            // granted or revoked: there is no API to revoke it in-app.
             ListTile(
               leading: Icon(
                 manageMedia.granted
@@ -96,13 +99,17 @@ class SettingsScreen extends ConsumerWidget {
                     ? l10n.manageMediaGranted
                     : l10n.manageMediaNotGranted,
               ),
+              onTap: () => unawaited(
+                ref.read(mediaLibraryProvider).requestManageMedia(),
+              ),
               trailing: manageMedia.granted
-                  ? null
-                  : FilledButton.tonal(
-                      onPressed: () => unawaited(
-                        ref.read(mediaLibraryProvider).requestManageMedia(),
+                  ? Text(l10n.manageMediaManage)
+                  : Text(
+                      l10n.manageMediaGrant,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
                       ),
-                      child: Text(l10n.manageMediaGrant),
                     ),
             ),
 

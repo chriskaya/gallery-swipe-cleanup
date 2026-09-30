@@ -79,6 +79,22 @@ void main() {
     expect(app.library.manageMediaRequests, 1);
   });
 
+  testWidgets('tapping the granted MANAGE_MEDIA tile opens the system page', (
+    tester,
+  ) async {
+    final app = await openSettings(tester, manageMediaGranted: true);
+    await tester.tap(find.text('Media management access'));
+    expect(app.library.manageMediaRequests, 1);
+  });
+
+  testWidgets('direction options are laid out left then right', (tester) async {
+    await openSettings(tester);
+    expect(
+      tester.getCenter(find.text('Left keeps')).dx,
+      lessThan(tester.getCenter(find.text('Right keeps')).dx),
+    );
+  });
+
   testWidgets('no warning once MANAGE_MEDIA is granted', (tester) async {
     await openSettings(
       tester,

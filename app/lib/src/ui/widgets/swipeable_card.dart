@@ -3,11 +3,13 @@
 /// the card behind can react in the same frame.
 ///
 /// All motion runs on one unbounded controller interpolating between two
-/// [_Pose]s. Unbounded so a spring can overshoot (t > 1) on the way back.
+/// [_Pose]s, optionally along a curve. Unbounded so a spring can overshoot
+/// (t > 1) on the way back.
 /// Commit thresholds live in `swipe_gesture.dart`.
 library;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
@@ -40,8 +42,13 @@ class _Pose {
   final double scale;
   final double opacity;
 
-  _Pose lerp(_Pose to, double t) => _Pose(
-    Offset.lerp(offset, to.offset, t)!,
+  /// Straight line, or a quadratic Bézier through [via] when given.
+  _Pose lerp(_Pose to, double t, {Offset? via}) => _Pose(
+    via == null
+        ? Offset.lerp(offset, to.offset, t)!
+        : offset * ((1 - t) * (1 - t)) +
+              via * (2 * (1 - t) * t) +
+              to.offset * (t * t),
     scale: lerpDouble(scale, to.scale, t),
     opacity: lerpDouble(opacity, to.opacity, t).clamp(0.0, 1.0),
   );
@@ -85,7 +92,18 @@ class _SwipeableCardState extends State<SwipeableCard>
   _Pose _pose = _Pose.rest;
   _Pose _from = _Pose.rest;
   _Pose _to = _Pose.rest;
+  Offset? _via;
   bool _armed = false;
+
+  /// True while animating in (undo, declined trash). The overlay stays hidden
+  /// meanwhile: the card crosses the centre, and showing whichever stamp its
+  /// position implies would flash KEEP and DELETE in turn.
+  bool _entering = false;
+
+  /// While springing back: the side the card was released on. Progress is
+  /// clamped to it, so the spring's overshoot past the centre never shows
+  /// the opposite verdict.
+  double? _returnSign;
 
   /// Set for good the moment a swipe commits; see ai-reader's
   /// SwipeableCard for why "is animating" is not enough to gate on.
@@ -113,6 +131,7 @@ class _SwipeableCardState extends State<SwipeableCard>
     widget.controller?._state = this;
     final side = widget.enterFrom;
     if (side != null) {
+      _entering = true;
       _pose = const _Pose(Offset.zero, opacity: 0);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _enter(side);
@@ -139,13 +158,21 @@ class _SwipeableCardState extends State<SwipeableCard>
   }
 
   void _onTick() {
-    setState(() => _pose = _from.lerp(_to, _motion.value));
+    setState(() => _pose = _from.lerp(_to, _motion.value, via: _via));
     _publishProgress();
   }
 
   void _publishProgress() {
-    final sign = _committedSign;
-    widget.progress.value = sign ?? swipeProgress(_pose.offset.dx, _size.width);
+    final committed = _committedSign;
+    final returning = _returnSign;
+    final p = swipeProgress(_pose.offset.dx, _size.width);
+    widget.progress.value =
+        committed ??
+        (_entering
+            ? 0
+            : returning == null
+            ? p
+            : returning * (returning * p).clamp(0.0, 1.0));
   }
 
   /// Offset, relative to this card's resting centre, of the target for
@@ -161,6 +188,8 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   void _onPanStart(DragStartDetails _) {
     _motion.stop();
+    _entering = false;
+    _returnSign = null;
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
@@ -197,9 +226,11 @@ class _SwipeableCardState extends State<SwipeableCard>
     _Pose to, {
     required Duration duration,
     required Curve curve,
+    Offset? via,
   }) {
     _from = _pose;
     _to = to;
+    _via = via;
     _motion.value = 0;
     return _motion.animateTo(1, duration: duration, curve: curve);
   }
@@ -208,8 +239,10 @@ class _SwipeableCardState extends State<SwipeableCard>
     _armed = false;
     _from = _pose;
     _to = _Pose.rest;
+    _via = null;
     final distance = _from.offset.distance;
     if (distance == 0) return;
+    _returnSign = _from.offset.dx == 0 ? null : _from.offset.dx.sign;
     if (_reduceMotion) {
       _animate(
         _Pose.rest,
@@ -260,14 +293,22 @@ class _SwipeableCardState extends State<SwipeableCard>
     final _Pose to;
     final Duration duration;
     final Curve curve;
+    Offset? via;
     if (_reduceMotion) {
       to = _Pose(Offset(sign * 48, 0), opacity: 0);
       duration = const Duration(milliseconds: 160);
       curve = Curves.easeOut;
     } else if (target != null) {
-      // Shrink into the badge / trash button: the destination is explicit.
+      // Shrink into the batch / trash button, which sits at the bottom of the
+      // delete side: keep travelling sideways first, then drop into it, so
+      // the swipe's direction carries through to the destination.
       to = _Pose(target, scale: 0.06, opacity: 0.2);
-      duration = const Duration(milliseconds: 380);
+      final start = _pose.offset.dx;
+      via = Offset(
+        sign < 0 ? math.min(start, target.dx) : math.max(start, target.dx),
+        _pose.offset.dy,
+      );
+      duration = const Duration(milliseconds: 420);
       curve = Curves.easeInCubic;
     } else {
       final end = Offset(
@@ -282,7 +323,7 @@ class _SwipeableCardState extends State<SwipeableCard>
       curve = Curves.easeOut;
     }
     try {
-      await _animate(to, duration: duration, curve: curve).orCancel;
+      await _animate(to, duration: duration, curve: curve, via: via).orCancel;
     } on TickerCanceled {
       // Disposed mid-flight: the parent already moved on.
       return;
@@ -293,29 +334,50 @@ class _SwipeableCardState extends State<SwipeableCard>
   void _enter(SwipeSide side) {
     final sign = side == SwipeSide.right ? 1.0 : -1.0;
     final target = _targetOffset(side);
-    final start = target != null
-        ? _Pose(target, scale: 0.06, opacity: 0.2)
-        : _Pose(Offset(sign * _size.width * 1.3, -32), opacity: 1);
-    setState(() => _pose = start);
+    _entering = true;
+    void done() {
+      if (!mounted) return;
+      _entering = false;
+      _publishProgress();
+    }
+
     if (_reduceMotion) {
+      setState(() => _pose = const _Pose(Offset.zero, opacity: 0));
       _animate(
         _Pose.rest,
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOut,
-      );
+      ).whenCompleteOrCancel(done);
       return;
     }
+    if (target != null) {
+      // Out of the batch / trash button: the exit path, reversed (rise,
+      // then slide back to the centre).
+      setState(() => _pose = _Pose(target, scale: 0.06, opacity: 0.2));
+      _animate(
+        _Pose.rest,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        via: Offset(target.dx, 0),
+      ).whenCompleteOrCancel(done);
+      return;
+    }
+    final start = _Pose(Offset(sign * _size.width * 1.3, -32));
+    setState(() => _pose = start);
     _from = start;
     _to = _Pose.rest;
+    _via = null;
     _motion.value = 0;
-    _motion.animateWith(
-      SpringSimulation(
-        const SpringDescription(mass: 1, stiffness: 300, damping: 22),
-        0,
-        1,
-        0,
-      ),
-    );
+    _motion
+        .animateWith(
+          SpringSimulation(
+            const SpringDescription(mass: 1, stiffness: 300, damping: 22),
+            0,
+            1,
+            0,
+          ),
+        )
+        .whenCompleteOrCancel(done);
   }
 
   @override
