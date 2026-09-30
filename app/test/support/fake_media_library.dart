@@ -4,8 +4,14 @@ import 'dart:typed_data';
 import 'package:tamis/src/media/media_item.dart';
 import 'package:tamis/src/media/media_library.dart';
 
-MediaItem image(String id) =>
-    MediaItem(id: id, kind: MediaKind.image, width: 400, height: 300);
+MediaItem image(String id) => MediaItem(
+  id: id,
+  kind: MediaKind.image,
+  width: 400,
+  height: 300,
+  album: 'Camera',
+  mimeType: 'image/jpeg',
+);
 
 MediaItem video(String id) => MediaItem(
   id: id,
@@ -13,6 +19,8 @@ MediaItem video(String id) => MediaItem(
   width: 1920,
   height: 1080,
   duration: const Duration(seconds: 12),
+  album: 'Camera',
+  mimeType: 'video/mp4',
 );
 
 /// In-memory media store. Items live in albums; the trash is a separate set
@@ -45,7 +53,7 @@ class FakeMediaLibrary implements MediaLibrary {
 
   List<MediaItem> _visible(MediaFilter filter) => [
     for (final e in _albums.entries)
-      if (filter.albumIds.isEmpty || filter.albumIds.contains(e.key))
+      if (filter.includesAlbum(e.key))
         for (final item in e.value)
           if (!trashed.contains(item.id) && _matches(item, filter.type)) item,
   ];
@@ -83,11 +91,11 @@ class FakeMediaLibrary implements MediaLibrary {
   @override
   Future<List<Album>> albums(MediaTypeFilter type) async => [
     for (final e in _albums.entries)
-      if (_visible(MediaFilter(type: type, albumIds: {e.key})).isNotEmpty)
+      if (_visible(MediaFilter.only({e.key}, type: type)).isNotEmpty)
         Album(
           id: e.key,
           name: e.key,
-          count: _visible(MediaFilter(type: type, albumIds: {e.key})).length,
+          count: _visible(MediaFilter.only({e.key}, type: type)).length,
         ),
   ];
 
@@ -101,6 +109,13 @@ class FakeMediaLibrary implements MediaLibrary {
     return all.sublist(start, end > all.length ? all.length : end);
   }
 
+  /// Per-item sizes; anything else is 1.5 MB.
+  final Map<String, int> sizes = {};
+
+  @override
+  Future<int?> fileSize(MediaItem item) async =>
+      await exists(item.id) ? sizes[item.id] ?? 1500000 : null;
+
   @override
   Future<bool> exists(String id) async => _albums.values.any(
     (l) => l.any((i) => i.id == id) && !trashed.contains(id),
@@ -113,7 +128,7 @@ class FakeMediaLibrary implements MediaLibrary {
   }) async => null;
 
   @override
-  Future<String?> playbackUri(MediaItem item) async =>
+  Future<String?> contentUri(MediaItem item) async =>
       'content://media/external/video/media/${item.id}';
 
   @override

@@ -153,12 +153,16 @@ void main() {
     await tester.tap(find.byIcon(Icons.delete_sweep_rounded));
     await tester.pumpAndSettle();
     expect(find.text('Deletion batch · 2'), findsOneWidget);
+    expect(find.text('3.0 MB to be freed'), findsOneWidget);
 
     await tester.tap(find.text('Move to trash (2)'));
     await tester.pumpAndSettle();
     expect(app.library.trashRequests, 1);
     expect(app.library.trashed, hasLength(2));
-    expect(find.text('2 items moved to the trash'), findsOneWidget);
+    expect(
+      find.text('2 items moved to the trash, 3.0 MB to be freed'),
+      findsOneWidget,
+    );
     expect(find.text('Deletion batch'), findsOneWidget);
   });
 
@@ -246,5 +250,27 @@ void main() {
     await app.pump(tester, locale: const Locale('fr'));
     expect(find.textContaining('3 éléments'), findsOneWidget);
     expect(find.bySemanticsLabel('Supprimer'), findsOneWidget);
+  });
+
+  testWidgets('share hands the current item to the share sheet', (
+    tester,
+  ) async {
+    final app = appWith(5);
+    await app.pump(tester);
+    final current = ready(app).current;
+    await tester.tap(find.byTooltip('Share'));
+    await tester.pumpAndSettle();
+    expect(app.sharer.shared.single.uri, endsWith('/${current.id}'));
+    expect(app.sharer.shared.single.mimeType, 'image/jpeg');
+    expect(ready(app).current, current, reason: 'sharing decides nothing');
+  });
+
+  testWidgets('the card shows its collection', (tester) async {
+    final app = appWith(5);
+    await app.pump(tester);
+    expect(
+      find.descendant(of: card, matching: find.text('Camera')),
+      findsOneWidget,
+    );
   });
 }

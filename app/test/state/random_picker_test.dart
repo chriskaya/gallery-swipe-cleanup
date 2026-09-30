@@ -87,9 +87,7 @@ void main() {
     );
     final picker = RandomPicker(library: lib, random: Random(5));
     for (var run = 0; run < 10; run++) {
-      final result = await picker.pick(
-        const MediaFilter(albumIds: {'screenshots'}),
-      );
+      final result = await picker.pick(const MediaFilter.only({'screenshots'}));
       expect((result as Picked).item.id, 's1');
     }
   });

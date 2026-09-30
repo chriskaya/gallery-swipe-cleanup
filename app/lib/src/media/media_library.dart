@@ -42,6 +42,9 @@ abstract interface class MediaLibrary {
   /// when the set shrank since the last [count].
   Future<List<MediaItem>> range(int start, int end, MediaFilter filter);
 
+  /// On-disk size in bytes, null when unknown or the item vanished.
+  Future<int?> fileSize(MediaItem item);
+
   /// Whether [id] still exists outside the trash.
   Future<bool> exists(String id);
 
@@ -49,8 +52,9 @@ abstract interface class MediaLibrary {
   /// For videos, a frame of the video. Null when the item vanished.
   Future<Uint8List?> preview(MediaItem item, {required int maxDimension});
 
-  /// A URI a video player can stream from (content:// on Android).
-  Future<String?> playbackUri(MediaItem item);
+  /// The item's content:// URI: streamed by the video player, and handed
+  /// to the share sheet.
+  Future<String?> contentUri(MediaItem item);
 
   /// Moves [items] to the system trash. Shows one system confirmation for the
   /// whole list unless MANAGE_MEDIA is granted. Returns the ids actually

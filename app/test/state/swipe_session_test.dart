@@ -103,6 +103,8 @@ void main() {
       final victim = h.ready.current;
       await h.session.decide(victim, Verdict.delete);
       expect(h.batch.ids, {victim.id});
+      expect(h.batch.items.single.sizeBytes, 1500000);
+      expect(h.session.pendingBytes, 1500000);
       expect(h.ready.pendingCount, 1);
       expect(h.library.trashRequests, 0);
       expect(h.store.data[DeletionBatch.key], contains(victim.id));
@@ -150,6 +152,7 @@ void main() {
       final notice = h.notices.single as BatchTrashed;
       expect(notice.trashed, 3);
       expect(notice.requested, 3);
+      expect(notice.bytes, 4500000);
     });
 
     test('declined commit keeps the batch intact', () async {

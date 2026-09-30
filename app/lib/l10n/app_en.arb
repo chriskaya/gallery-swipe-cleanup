@@ -87,7 +87,7 @@
     }
   },
   "batchEmpty": "The batch is empty. Swipe items towards delete to collect them here.",
-  "batchHint": "Tap an item to keep it after all. Trashed items can be recovered from the system trash for about 30 days.",
+  "batchHint": "Tap an item to keep it after all. Trashed items stay recoverable in the system trash for about 30 days; the space is freed when the trash is emptied.",
   "batchCommit": "{count, plural, =0{Move to trash} other{Move to trash ({count})}}",
   "@batchCommit": {
     "placeholders": {
@@ -124,5 +124,55 @@
   "permissionBody": "Tamis shows your photos and videos one at a time so you can decide what to keep. Nothing leaves your phone: the app has no internet access.",
   "permissionGrant": "Allow access",
   "permissionOpenSettings": "Open app settings",
-  "manageMediaManage": "Manage"
+  "manageMediaManage": "Manage",
+  "share": "Share",
+  "shareFailed": "This item cannot be shared.",
+  "semanticsCollection": "Album {name}",
+  "@semanticsCollection": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noticeBatchTrashedSize": "{count, plural, =1{1 item moved to the trash, {size} to be freed} other{{count} items moved to the trash, {size} to be freed}}",
+  "@noticeBatchTrashedSize": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "batchFreeable": "{size} to be freed",
+  "@batchFreeable": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "filterSelectAll": "Select all",
+  "filterDeselectAll": "Deselect all",
+  "filterSelectedCount": "{selected} of {total} selected",
+  "@filterSelectedCount": {
+    "placeholders": {
+      "selected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "filterAlbumsExcluded": "{count, plural, =1{all but 1 album} other{all but {count} albums}}",
+  "@filterAlbumsExcluded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

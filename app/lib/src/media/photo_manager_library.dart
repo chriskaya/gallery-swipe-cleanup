@@ -83,7 +83,7 @@ class PhotoManagerLibrary implements MediaLibrary {
 
   @override
   Future<int> count(MediaFilter filter) async {
-    if (filter.albumIds.isEmpty) {
+    if (filter.allAlbums) {
       return PhotoManager.getAssetCount(type: _requestType(filter.type));
     }
     final slices = await _buildSlices(filter);
@@ -99,7 +99,7 @@ class PhotoManagerLibrary implements MediaLibrary {
     );
     final slices = <({AssetPathEntity path, int count})>[];
     for (final path in paths) {
-      if (!filter.albumIds.contains(path.id)) continue;
+      if (!filter.includesAlbum(path.id)) continue;
       final count = await path.assetCountAsync;
       if (count > 0) slices.add((path: path, count: count));
     }
@@ -110,7 +110,7 @@ class PhotoManagerLibrary implements MediaLibrary {
   @override
   Future<List<MediaItem>> range(int start, int end, MediaFilter filter) async {
     if (start < 0 || end <= start) return const [];
-    if (filter.albumIds.isEmpty) {
+    if (filter.allAlbums) {
       final assets = await PhotoManager.getAssetListRange(
         start: start,
         end: end,
@@ -145,7 +145,16 @@ class PhotoManagerLibrary implements MediaLibrary {
     height: e.orientatedHeight,
     duration: e.type == AssetType.video ? e.videoDuration : Duration.zero,
     createdAt: e.createDateTime,
+    album: _albumOf(e.relativePath),
+    mimeType: e.mimeType,
   );
+
+  /// MediaStore's BUCKET_DISPLAY_NAME is the last folder of RELATIVE_PATH
+  /// ("DCIM/Camera/" -> "Camera"), which the plugin already reads.
+  static String? _albumOf(String? relativePath) {
+    final parts = relativePath?.split('/').where((p) => p.isNotEmpty).toList();
+    return parts == null || parts.isEmpty ? null : parts.last;
+  }
 
   static AssetEntity _toEntity(MediaItem item) => AssetEntity(
     id: item.id,
@@ -154,6 +163,16 @@ class PhotoManagerLibrary implements MediaLibrary {
     height: item.height,
     duration: item.duration.inSeconds,
   );
+
+  @override
+  Future<int?> fileSize(MediaItem item) async {
+    try {
+      final size = await _toEntity(item).fileSize;
+      return size > 0 ? size : null;
+    } on PlatformException {
+      return null;
+    }
+  }
 
   @override
   Future<bool> exists(String id) => PhotoManager.plugin.assetExistsWithId(id);
@@ -181,7 +200,7 @@ class PhotoManagerLibrary implements MediaLibrary {
   }
 
   @override
-  Future<String?> playbackUri(MediaItem item) => _toEntity(item).getMediaUrl();
+  Future<String?> contentUri(MediaItem item) => _toEntity(item).getMediaUrl();
 
   @override
   Future<Set<String>> moveToTrash(List<MediaItem> items) async {

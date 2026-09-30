@@ -15,6 +15,9 @@ class MediaItem {
     required this.height,
     this.duration = Duration.zero,
     this.createdAt,
+    this.album,
+    this.mimeType,
+    this.sizeBytes,
   });
 
   final String id;
@@ -27,6 +30,28 @@ class MediaItem {
   /// Zero for images.
   final Duration duration;
   final DateTime? createdAt;
+
+  /// Folder (MediaStore bucket) name, e.g. "Camera" or "WhatsApp Images".
+  final String? album;
+
+  /// e.g. image/jpeg, video/mp4. Needed to share the item.
+  final String? mimeType;
+
+  /// On-disk size. Filled when the item joins the deletion batch, to show
+  /// how much space the batch frees.
+  final int? sizeBytes;
+
+  MediaItem withSize(int? bytes) => MediaItem(
+    id: id,
+    kind: kind,
+    width: width,
+    height: height,
+    duration: duration,
+    createdAt: createdAt,
+    album: album,
+    mimeType: mimeType,
+    sizeBytes: bytes,
+  );
 
   bool get isVideo => kind == MediaKind.video;
 
@@ -41,6 +66,9 @@ class MediaItem {
     'h': height,
     'd': duration.inMilliseconds,
     if (createdAt != null) 'c': createdAt!.millisecondsSinceEpoch,
+    if (album != null) 'a': album,
+    if (mimeType != null) 'm': mimeType,
+    if (sizeBytes != null) 's': sizeBytes,
   };
 
   /// Returns null for anything that does not look like a [toJson] output, so
@@ -53,6 +81,9 @@ class MediaItem {
     final h = json['h'];
     final d = json['d'];
     final c = json['c'];
+    final a = json['a'];
+    final m = json['m'];
+    final size = json['s'];
     if (id is! String || id.isEmpty || kind == null) return null;
     if (w is! int || h is! int || d is! int) return null;
     return MediaItem(
@@ -62,6 +93,9 @@ class MediaItem {
       height: h,
       duration: Duration(milliseconds: d),
       createdAt: c is int ? DateTime.fromMillisecondsSinceEpoch(c) : null,
+      album: a is String ? a : null,
+      mimeType: m is String ? m : null,
+      sizeBytes: size is int ? size : null,
     );
   }
 
@@ -94,25 +128,66 @@ class Album {
 enum MediaTypeFilter { all, images, videos }
 
 /// The scope random picks are drawn from.
+///
+/// Albums are either an allow-list or a deny-list ([excludeAlbums]). The
+/// mode follows how the user built the selection: "select all, then untick"
+/// keeps albums created later included, "select none, then tick" keeps them
+/// out.
 class MediaFilter {
   const MediaFilter({
     this.type = MediaTypeFilter.all,
     this.albumIds = const {},
+    this.excludeAlbums = true,
   });
 
+  /// Every album except [albumIds].
+  const MediaFilter.except(
+    Set<String> ids, {
+    MediaTypeFilter type = MediaTypeFilter.all,
+  }) : this(type: type, albumIds: ids);
+
+  /// Only [albumIds].
+  const MediaFilter.only(
+    Set<String> ids, {
+    MediaTypeFilter type = MediaTypeFilter.all,
+  }) : this(type: type, albumIds: ids, excludeAlbums: false);
+
   final MediaTypeFilter type;
-
-  /// Empty means every album.
   final Set<String> albumIds;
+  final bool excludeAlbums;
 
-  bool get isDefault => type == MediaTypeFilter.all && albumIds.isEmpty;
+  /// No album restriction at all: the whole library.
+  bool get allAlbums => excludeAlbums && albumIds.isEmpty;
 
-  MediaFilter copyWith({MediaTypeFilter? type, Set<String>? albumIds}) =>
-      MediaFilter(type: type ?? this.type, albumIds: albumIds ?? this.albumIds);
+  /// Nothing can match: an empty allow-list.
+  bool get noAlbums => !excludeAlbums && albumIds.isEmpty;
+
+  bool get isDefault => type == MediaTypeFilter.all && allAlbums;
+
+  bool includesAlbum(String id) =>
+      excludeAlbums ? !albumIds.contains(id) : albumIds.contains(id);
+
+  MediaFilter copyWith({
+    MediaTypeFilter? type,
+    Set<String>? albumIds,
+    bool? excludeAlbums,
+  }) => MediaFilter(
+    type: type ?? this.type,
+    albumIds: albumIds ?? this.albumIds,
+    excludeAlbums: excludeAlbums ?? this.excludeAlbums,
+  );
+
+  /// Ticks or unticks one album, whatever the list's mode.
+  MediaFilter withAlbum(String id, {required bool included}) {
+    final ids = {...albumIds};
+    (included != excludeAlbums) ? ids.add(id) : ids.remove(id);
+    return copyWith(albumIds: ids);
+  }
 
   Map<String, Object?> toJson() => {
     'type': type.name,
     'albums': albumIds.toList()..sort(),
+    'exclude': excludeAlbums,
   };
 
   static MediaFilter fromJson(Object? json) {
@@ -120,11 +195,15 @@ class MediaFilter {
     final type =
         MediaTypeFilter.values.asNameMap()[json['type']] ?? MediaTypeFilter.all;
     final albums = json['albums'];
+    final ids = albums is List<Object?>
+        ? albums.whereType<String>().toSet()
+        : <String>{};
+    final exclude = json['exclude'];
     return MediaFilter(
       type: type,
-      albumIds: albums is List<Object?>
-          ? albums.whereType<String>().toSet()
-          : const {},
+      albumIds: ids,
+      // v0.1 stored an allow-list only, where empty meant "all".
+      excludeAlbums: exclude is bool ? exclude : ids.isEmpty,
     );
   }
 
@@ -132,9 +211,11 @@ class MediaFilter {
   bool operator ==(Object other) =>
       other is MediaFilter &&
       other.type == type &&
+      other.excludeAlbums == excludeAlbums &&
       other.albumIds.length == albumIds.length &&
       other.albumIds.containsAll(albumIds);
 
   @override
-  int get hashCode => Object.hash(type, Object.hashAllUnordered(albumIds));
+  int get hashCode =>
+      Object.hash(type, excludeAlbums, Object.hashAllUnordered(albumIds));
 }

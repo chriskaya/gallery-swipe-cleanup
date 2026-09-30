@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tamis/src/state/settings.dart';
 import 'package:tamis/src/ui/app.dart';
 import 'package:tamis/src/ui/providers.dart';
+import 'package:tamis/src/ui/sharer.dart';
 import 'package:tamis/src/ui/window_security.dart';
 
 import 'fake_key_value_store.dart';
@@ -16,6 +17,14 @@ class FakeWindowSecurity implements WindowSecurity {
 
   @override
   Future<void> setSecure(bool secure) async => calls.add(secure);
+}
+
+class FakeSharer implements Sharer {
+  final List<({String uri, String? mimeType})> shared = [];
+
+  @override
+  Future<void> share({required String uri, required String? mimeType}) async =>
+      shared.add((uri: uri, mimeType: mimeType));
 }
 
 class TestApp {
@@ -29,6 +38,7 @@ class TestApp {
   final FakeMediaLibrary library;
   final FakeKeyValueStore store;
   final FakeWindowSecurity window;
+  final FakeSharer sharer = FakeSharer();
   late ProviderContainer container;
 
   Future<void> pump(
@@ -49,6 +59,7 @@ class TestApp {
           mediaLibraryProvider.overrideWithValue(library),
           keyValueStoreProvider.overrideWithValue(store),
           windowSecurityProvider.overrideWithValue(window),
+          sharerProvider.overrideWithValue(sharer),
           randomProvider.overrideWithValue(Random(1)),
           initialSettingsProvider.overrideWithValue(settings),
         ],

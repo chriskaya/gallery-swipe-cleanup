@@ -24,6 +24,13 @@ class DeletionBatch {
   bool get isEmpty => _items.isEmpty;
   bool contains(String id) => _items.containsKey(id);
 
+  /// Sum of known sizes: what trashing the batch frees once the system trash
+  /// is emptied.
+  int get totalBytes => bytesOf(_items.values);
+
+  static int bytesOf(Iterable<MediaItem> items) =>
+      items.fold(0, (sum, item) => sum + (item.sizeBytes ?? 0));
+
   Future<void> load() async {
     _items.clear();
     final raw = await _store.getString(key);
@@ -57,6 +64,21 @@ class DeletionBatch {
       changed |= _items.remove(id) != null;
     }
     if (changed) await _persist();
+  }
+
+  /// Looks up sizes missing from entries persisted before sizes were
+  /// recorded. Returns how many were filled.
+  Future<int> fillMissingSizes(Future<int?> Function(MediaItem) sizeOf) async {
+    var filled = 0;
+    for (final item in _items.values.toList()) {
+      if (item.sizeBytes != null) continue;
+      final size = await sizeOf(item);
+      if (size == null) continue;
+      _items[item.id] = item.withSize(size);
+      filled++;
+    }
+    if (filled > 0) await _persist();
+    return filled;
   }
 
   /// Drops items that no longer exist (deleted by another app, or already

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../media/media_item.dart';
 import '../state/swipe_session.dart';
+import 'format.dart';
 import 'l10n.dart';
 import 'providers.dart';
 import 'widgets/media_view.dart';
@@ -37,7 +38,9 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
     ref.watch(sessionProvider.select(_pendingCount));
     final controller = ref.read(sessionProvider.notifier);
     final items = controller.pendingItems.reversed.toList();
+    final bytes = controller.pendingBytes;
     final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toLanguageTag();
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.batchTitle(items.length))),
@@ -50,6 +53,22 @@ class _BatchScreenState extends ConsumerState<BatchScreen> {
             )
           : Column(
               children: [
+                if (bytes > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sd_storage_outlined, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.batchFreeable(formatBytes(bytes, locale)),
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                   child: Text(

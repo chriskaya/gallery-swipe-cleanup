@@ -131,4 +131,66 @@ void main() {
       MediaTypeFilter.videos,
     );
   });
+
+  testWidgets('select all, then untick a collection to exclude it', (
+    tester,
+  ) async {
+    final lib = FakeMediaLibrary(
+      albums: {
+        'Camera': [image('c1'), image('c2')],
+        'WhatsApp': [image('w1'), image('w2'), image('w3')],
+        'Screenshots': [image('s1')],
+      },
+    );
+    final app = TestApp(library: lib);
+    await app.pump(tester);
+    await tester.tap(find.byType(ActionChip));
+    await tester.pumpAndSettle();
+    expect(find.text('3 of 3 selected'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'WhatsApp'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 of 3 selected'), findsOneWidget);
+    await tester.tap(find.text('Apply'));
+    await tester.pumpAndSettle();
+
+    final filter = app.container.read(settingsProvider).filter;
+    expect(filter.excludeAlbums, isTrue);
+    expect(filter.albumIds, {'WhatsApp'});
+    expect((app.container.read(sessionProvider) as SessionReady).total, 3);
+    expect(find.textContaining('all but 1 album'), findsOneWidget);
+
+    // A collection created later stays included.
+    lib.addItem(image('n1'), album: 'New');
+    expect(await lib.count(filter), 4);
+  });
+
+  testWidgets('deselect all, then tick only what to keep', (tester) async {
+    final lib = FakeMediaLibrary(
+      albums: {
+        'Camera': [image('c1'), image('c2')],
+        'WhatsApp': [image('w1')],
+      },
+    );
+    final app = TestApp(library: lib);
+    await app.pump(tester);
+    await tester.tap(find.byType(ActionChip));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Deselect all'));
+    await tester.pumpAndSettle();
+    expect(find.text('0 of 2 selected'), findsOneWidget);
+    final apply = find.widgetWithText(FilledButton, 'Apply');
+    expect(tester.widget<FilledButton>(apply).onPressed, isNull);
+
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Camera'));
+    await tester.pumpAndSettle();
+    await tester.tap(apply);
+    await tester.pumpAndSettle();
+    final filter = app.container.read(settingsProvider).filter;
+    expect(filter.excludeAlbums, isFalse);
+    expect(filter.albumIds, {'Camera'});
+    lib.addItem(image('n1'), album: 'New');
+    expect(await lib.count(filter), 2, reason: 'new collections stay out');
+  });
 }

@@ -4,7 +4,7 @@ description: "Swipe through your gallery one random item at a time: keep it or s
 publish_to: 'none'
 
 # versionName+versionCode. Bump deliberately; release automation comes later.
-version: 0.1.1+2
+version: 0.2.0+3
 
 environment:
   # Matches the pinned Flutter 3.44.4 toolchain (Dart 3.12.2), see

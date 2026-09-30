@@ -18,6 +18,7 @@ import '../state/random_picker.dart';
 import '../state/settings.dart';
 import '../state/swipe_session.dart';
 import '../storage/key_value_store.dart';
+import 'sharer.dart';
 import 'window_security.dart';
 
 final keyValueStoreProvider = Provider<KeyValueStore>(
@@ -31,6 +32,8 @@ final mediaLibraryProvider = Provider<MediaLibrary>(
 final windowSecurityProvider = Provider<WindowSecurity>(
   (ref) => const ChannelWindowSecurity(),
 );
+
+final sharerProvider = Provider<Sharer>((ref) => const ChannelSharer());
 
 /// Seeded in tests for reproducible draws.
 final randomProvider = Provider<Random>((ref) => Random.secure());
@@ -156,6 +159,15 @@ class SessionController extends Notifier<SessionState> {
   late SwipeSession _session;
 
   List<MediaItem> get pendingItems => _session.pendingItems;
+  int get pendingBytes => _session.pendingBytes;
+
+  /// Opens the share sheet for [item]. False when it has no shareable URI.
+  Future<bool> share(MediaItem item) async {
+    final uri = await ref.read(mediaLibraryProvider).contentUri(item);
+    if (uri == null) return false;
+    await ref.read(sharerProvider).share(uri: uri, mimeType: item.mimeType);
+    return true;
+  }
 
   @override
   SessionState build() {

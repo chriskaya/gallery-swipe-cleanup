@@ -17,6 +17,13 @@ swipe to keep, swipe to delete. *Tamis* is French for "sieve".
     "Media management" special access (Android 12+), Android asks for
     confirmation on every request, and the app warns about it.
 - **Undo** for the last 30 decisions, including restoring from the trash.
+- **Batch size**: the review screen and the confirmation show how much space
+  the batch frees (once the system trash is emptied).
+- **Share** the item on screen through the Android share sheet.
+- Each card shows its **collection** (MediaStore folder) and date.
+- **Collection filter** with select all / deselect all: select all then
+  untick what to exclude (collections created later stay included), or
+  deselect all then tick what to keep.
 - **Videos** autoplay (configurable), looped and muted by default.
 - **FR + EN**, following the system language.
 

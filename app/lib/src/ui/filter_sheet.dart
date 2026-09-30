@@ -27,13 +27,25 @@ class FilterSheet extends ConsumerStatefulWidget {
 }
 
 class _FilterSheetState extends ConsumerState<FilterSheet> {
+  /// At least one album must remain selected.
+  bool _canApply(List<Album>? albums) {
+    if (_filter.noAlbums) return false;
+    if (albums == null) return true;
+    return albums.any((a) => _filter.includesAlbum(a.id));
+  }
+
   late MediaFilter _filter = ref.read(settingsProvider).filter;
 
-  void _toggleAlbum(String id, bool selected) {
-    final ids = {..._filter.albumIds};
-    selected ? ids.add(id) : ids.remove(id);
-    setState(() => _filter = _filter.copyWith(albumIds: ids));
-  }
+  void _toggleAlbum(String id, bool selected) =>
+      setState(() => _filter = _filter.withAlbum(id, included: selected));
+
+  /// Select all switches to a deny-list (then untick what to exclude);
+  /// deselect all switches to an allow-list (then tick what to include).
+  void _setAll(bool selected) => setState(
+    () => _filter = selected
+        ? MediaFilter.except(const {}, type: _filter.type)
+        : MediaFilter.only(const {}, type: _filter.type),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -70,26 +82,14 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
                   setState(() => _filter = _filter.copyWith(type: s.first)),
             ),
           ),
-          CheckboxListTile(
-            value: _filter.albumIds.isEmpty,
-            title: Text(l10n.filterAllAlbums),
-            onChanged: (_) =>
-                setState(() => _filter = _filter.copyWith(albumIds: const {})),
-          ),
-          const Divider(height: 1),
           Expanded(
             child: switch (albums) {
-              AsyncData(:final value) => ListView(
-                controller: scroll,
-                children: [
-                  for (final album in value)
-                    CheckboxListTile(
-                      value: _filter.albumIds.contains(album.id),
-                      title: Text(album.name),
-                      subtitle: Text(l10n.itemCount(album.count)),
-                      onChanged: (v) => _toggleAlbum(album.id, v ?? false),
-                    ),
-                ],
+              AsyncData(:final value) => _AlbumList(
+                albums: value,
+                filter: _filter,
+                scroll: scroll,
+                onToggle: _toggleAlbum,
+                onSetAll: _setAll,
               ),
               AsyncError() => Center(child: Text(l10n.loadFailed)),
               _ => const Center(child: CircularProgressIndicator()),
@@ -102,20 +102,69 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
-                onPressed: () {
-                  unawaited(
-                    ref
-                        .read(settingsProvider.notifier)
-                        .update((s) => s.copyWith(filter: _filter)),
-                  );
-                  Navigator.of(context).pop();
-                },
+                onPressed: !_canApply(albums.value)
+                    ? null
+                    : () {
+                        unawaited(
+                          ref
+                              .read(settingsProvider.notifier)
+                              .update((s) => s.copyWith(filter: _filter)),
+                        );
+                        Navigator.of(context).pop();
+                      },
                 child: Text(l10n.filterApply),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AlbumList extends StatelessWidget {
+  const _AlbumList({
+    required this.albums,
+    required this.filter,
+    required this.scroll,
+    required this.onToggle,
+    required this.onSetAll,
+  });
+
+  final List<Album> albums;
+  final MediaFilter filter;
+  final ScrollController scroll;
+  final void Function(String id, bool selected) onToggle;
+  final ValueChanged<bool> onSetAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final selected = albums.where((a) => filter.includesAlbum(a.id)).length;
+    final all = selected == albums.length;
+    return ListView(
+      controller: scroll,
+      children: [
+        CheckboxListTile(
+          tristate: true,
+          value: all ? true : (selected == 0 ? false : null),
+          title: Text(
+            all ? l10n.filterDeselectAll : l10n.filterSelectAll,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(l10n.filterSelectedCount(selected, albums.length)),
+          // Tristate cycles false -> true -> null; drive it explicitly.
+          onChanged: (_) => onSetAll(!all),
+        ),
+        const Divider(height: 1),
+        for (final album in albums)
+          CheckboxListTile(
+            value: filter.includesAlbum(album.id),
+            title: Text(album.name),
+            subtitle: Text(l10n.itemCount(album.count)),
+            onChanged: (v) => onToggle(album.id, v ?? false),
+          ),
+      ],
     );
   }
 }

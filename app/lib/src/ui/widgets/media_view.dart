@@ -120,7 +120,7 @@ class _VideoViewState extends ConsumerState<VideoView> {
   Future<void> _init() async {
     VideoPlayerController? controller;
     try {
-      final uri = await ref.read(mediaLibraryProvider).playbackUri(widget.item);
+      final uri = await ref.read(mediaLibraryProvider).contentUri(widget.item);
       if (uri == null || !mounted) return;
       controller = ref.read(videoControllerFactoryProvider)(uri);
       await controller.initialize();

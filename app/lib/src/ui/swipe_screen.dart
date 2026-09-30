@@ -12,10 +12,12 @@ import '../state/settings.dart';
 import '../state/swipe_session.dart';
 import 'batch_screen.dart';
 import 'filter_sheet.dart';
+import 'format.dart';
 import 'l10n.dart';
 import 'providers.dart';
 import 'settings_screen.dart';
 import 'widgets/action_bar.dart';
+import 'widgets/item_info_chip.dart';
 import 'widgets/media_view.dart';
 import 'widgets/swipeable_card.dart';
 import 'widgets/verdict_overlay.dart';
@@ -63,13 +65,16 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
 
   void _showNotice(SessionNotice notice) {
     final l10n = context.l10n;
+    final locale = Localizations.localeOf(context).toLanguageTag();
     final text = switch (notice) {
       TrashDeclined() => l10n.noticeTrashDeclined,
       RestoreFailed() => l10n.noticeRestoreFailed,
       BatchTrashed(trashed: 0) => l10n.noticeBatchDeclined,
-      BatchTrashed(:final trashed, :final requested)
+      BatchTrashed(:final trashed, :final requested, :final bytes)
           when trashed == requested =>
-        l10n.noticeBatchTrashed(trashed),
+        bytes > 0
+            ? l10n.noticeBatchTrashedSize(trashed, formatBytes(bytes, locale))
+            : l10n.noticeBatchTrashed(trashed),
       BatchTrashed(:final trashed, :final requested) => l10n.noticeBatchPartial(
         trashed,
         requested,
@@ -111,7 +116,11 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            _TopBar(filter: settings.filter, total: total),
+            _TopBar(
+              filter: settings.filter,
+              total: total,
+              current: session is SessionReady ? session.current : null,
+            ),
             if (limited) const _LimitedAccessBanner(),
             Expanded(
               child: Padding(
@@ -185,6 +194,15 @@ class _SwipeScreenState extends ConsumerState<SwipeScreen> {
               fit: StackFit.expand,
               children: [
                 MediaView(item: s.current, active: true),
+                Positioned(
+                  left: 10,
+                  top: 10,
+                  right: 10,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: ItemInfoChip(item: s.current),
+                  ),
+                ),
                 VerdictOverlay(progress: _progress, settings: settings),
               ],
             ),
@@ -224,10 +242,17 @@ class _CardFrame extends StatelessWidget {
 }
 
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.filter, required this.total});
+  const _TopBar({
+    required this.filter,
+    required this.total,
+    required this.current,
+  });
 
   final MediaFilter filter;
   final int? total;
+
+  /// The item on screen, shared by the share button.
+  final MediaItem? current;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -239,10 +264,13 @@ class _TopBar extends ConsumerWidget {
     };
     final parts = [
       type,
-      if (filter.albumIds.isNotEmpty)
-        l10n.filterAlbumCount(filter.albumIds.length),
+      if (!filter.allAlbums)
+        filter.excludeAlbums
+            ? l10n.filterAlbumsExcluded(filter.albumIds.length)
+            : l10n.filterAlbumCount(filter.albumIds.length),
       if (total != null) l10n.itemCount(total!),
     ];
+    final item = current;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
       child: Row(
@@ -260,6 +288,22 @@ class _TopBar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
+          IconButton(
+            tooltip: l10n.share,
+            icon: const Icon(Icons.share_rounded),
+            onPressed: item == null
+                ? null
+                : () async {
+                    final ok = await ref
+                        .read(sessionProvider.notifier)
+                        .share(item);
+                    if (!ok && context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(l10n.shareFailed)));
+                    }
+                  },
+          ),
           IconButton(
             tooltip: l10n.settingsTitle,
             icon: const Icon(Icons.tune_rounded),

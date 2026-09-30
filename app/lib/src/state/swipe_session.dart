@@ -103,10 +103,17 @@ class RestoreFailed extends SessionNotice {
 }
 
 class BatchTrashed extends SessionNotice {
-  const BatchTrashed({required this.trashed, required this.requested});
+  const BatchTrashed({
+    required this.trashed,
+    required this.requested,
+    this.bytes = 0,
+  });
 
   final int trashed;
   final int requested;
+
+  /// Size of what was trashed, freed once the system trash is emptied.
+  final int bytes;
 }
 
 class OperationFailed extends SessionNotice {
@@ -164,6 +171,7 @@ class SwipeSession {
 
   MediaFilter get filter => _filter;
   List<MediaItem> get pendingItems => _batch.items;
+  int get pendingBytes => _batch.totalBytes;
 
   SessionState get state {
     final failure = _failure;
@@ -198,6 +206,7 @@ class SwipeSession {
     _emit();
     await _batch.load();
     await _batch.prune(_library.exists);
+    await _batch.fillMissingSizes(_library.fileSize);
     await _fill();
   });
 
@@ -212,7 +221,7 @@ class SwipeSession {
 
     if (verdict == Verdict.delete) {
       if (_deletionMode() == DeletionMode.batch) {
-        await _batch.add(item);
+        await _batch.add(item.withSize(await _library.fileSize(item)));
         _emit();
       } else {
         final trashed = await _library.moveToTrash([item]);
@@ -253,12 +262,19 @@ class SwipeSession {
     final items = _batch.items;
     if (items.isEmpty) return;
     final trashed = await _library.moveToTrash(items);
+    final bytes = DeletionBatch.bytesOf(
+      items.where((i) => trashed.contains(i.id)),
+    );
     await _batch.removeAll(trashed);
     for (final decision in _history) {
       if (trashed.contains(decision.item.id)) decision.trashed = true;
     }
     onNotice?.call(
-      BatchTrashed(trashed: trashed.length, requested: items.length),
+      BatchTrashed(
+        trashed: trashed.length,
+        requested: items.length,
+        bytes: bytes,
+      ),
     );
     _emit();
   });
