@@ -1,0 +1,19 @@
+# gitleaks configuration: default rules, plus the Android signing material
+# this project could plausibly leak.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "android-keystore-password"
+description = "Android signing credentials in key.properties or Gradle files"
+# A literal value: key.properties style (storePassword=secret) or a quoted
+# Gradle string. Reading it from a Properties object or env is fine.
+regex = '''(?im)(store|key)Password\s*(=\s*["'][^"'$]{4,}["']|[=:]\s*[^\s"'(){}$]{4,}\s*$)'''
+keywords = ["storepassword", "keypassword"]
+
+[allowlist]
+description = "Generated or third-party files with no secrets"
+paths = [
+  '''app/pubspec\.lock''',
+  '''app/lib/l10n/gen/''',
+]

@@ -1,0 +1,99 @@
+---
+# Verify gate: secret scan + format + analyze + unit/widget tests, on every
+# PR and on pushes to main. No APK here: that is debug-apk.yml, on demand.
+#
+# GitHub-hosted x86_64 runners for now. When this moves to Codeberg/Forgejo
+# on the self-hosted ARM64 runner, port it from ai-reader's
+# .forgejo/workflows/app.yml instead (Flutter mirror clone, TAR_OPTIONS for
+# rootless Docker); the steps below map one to one.
+name: CI
+
+on:  # yamllint disable-line rule:truthy
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned so CI and a workstation cannot disagree about the toolchain. Bump
+  # deliberately, together with app/pubspec.yaml's sdk constraint.
+  FLUTTER_VERSION: "3.44.4"
+  # What tag 3.44.4 resolved to when pinned; tags are mutable.
+  FLUTTER_COMMIT: "ad70ec4617166f1c38e5d2bfd388af71fda14f06"
+  GITLEAKS_VERSION: "8.30.1"
+  # sha256 of gitleaks_8.30.1_linux_x64.tar.gz, hashed from the downloaded
+  # bytes and matching upstream's checksums file. Pinned here so an upstream
+  # compromise shows up as a diff rather than silently changing what runs.
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+jobs:
+  gitleaks:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Full history: a secret removed in a later commit is still leaked.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The binary, not gitleaks-action: no license key, no PR-commenting
+      # token, nothing but read access.
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "/tmp/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  /tmp/${archive}" | sha256sum -c -
+          tar -xzf "/tmp/${archive}" -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan the full history
+        run: gitleaks git --config .gitleaks.toml --redact --verbose --exit-code 1 .
+
+  verify:
+    name: format + analyze + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Check the toolchain revision
+        run: |
+          set -euo pipefail
+          got="$(flutter --version --machine | jq -r .frameworkRevision)"
+          if [ "$got" != "$FLUTTER_COMMIT" ]; then
+            echo "Flutter $FLUTTER_VERSION is $got, expected $FLUTTER_COMMIT" >&2
+            exit 1
+          fi
+
+      - name: Resolve dependencies
+        # --enforce-lockfile: CI runs exactly what pubspec.lock pins, and
+        # fails if a package's content hash no longer matches it.
+        run: flutter pub get --enforce-lockfile
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Test
+        run: flutter test

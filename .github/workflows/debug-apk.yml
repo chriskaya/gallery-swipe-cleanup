@@ -1,0 +1,98 @@
+---
+# On-demand debug APK: manual trigger only (Actions tab > "Debug APK" > Run
+# workflow, any branch), uploaded as a 7-day workflow artifact. Also checks
+# that the matching release build declares no INTERNET permission — the
+# app's central privacy guarantee (see SECURITY.md).
+#
+# GitHub-hosted x86_64 runner: none of the ARM64 workarounds from ai-reader's
+# .forgejo/workflows/debug-apk.yml are needed here (aapt2/aidl/zipalign patch,
+# cmake/ninja swap, NDK under qemu). They come back with the move to the
+# self-hosted Forgejo ARM64 runner.
+name: Debug APK
+
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.44.4"
+  FLUTTER_COMMIT: "ad70ec4617166f1c38e5d2bfd388af71fda14f06"
+
+jobs:
+  debug-apk:
+    name: assembleDebug
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Check the toolchain revision
+        run: |
+          set -euo pipefail
+          got="$(flutter --version --machine | jq -r .frameworkRevision)"
+          if [ "$got" != "$FLUTTER_COMMIT" ]; then
+            echo "Flutter $FLUTTER_VERSION is $got, expected $FLUTTER_COMMIT" >&2
+            exit 1
+          fi
+
+      - name: Resolve dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Build release APK (permission check only, not uploaded)
+        run: flutter build apk --release
+
+      - name: Assert the release APK permissions match the allowlist
+        # Any new permission (a dependency bump merging INTERNET, say) fails
+        # the run until it is reviewed and added here or removed in the
+        # manifest. The DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION pair is
+        # androidx.core's own signature-level permission, app-internal.
+        run: |
+          set -euo pipefail
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2"
+          actual="$("$aapt2" dump permissions build/app/outputs/flutter-apk/app-release.apk \
+            | grep -o "name='[^']*'" | sort -u)"
+          expected="$(sort -u <<'PERMS'
+          name='android.permission.MANAGE_MEDIA'
+          name='android.permission.READ_EXTERNAL_STORAGE'
+          name='android.permission.READ_MEDIA_IMAGES'
+          name='android.permission.READ_MEDIA_VIDEO'
+          name='android.permission.READ_MEDIA_VISUAL_USER_SELECTED'
+          name='fr.kayanet.tamis.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+          PERMS
+          )"
+          expected="$(sed 's/^ *//' <<<"$expected" | sort -u)"
+          echo "$actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "Release APK permissions differ from the allowlist:" >&2
+            diff <(echo "$expected") <(echo "$actual") >&2 || true
+            exit 1
+          fi
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: tamis-debug-${{ github.sha }}
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
