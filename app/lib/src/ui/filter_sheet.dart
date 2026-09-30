@@ -1,0 +1,121 @@
+/// Scope of the random draw: media type and albums. Edited locally and
+/// applied once, so ticking five albums redraws once, not five times.
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../media/media_item.dart';
+import 'l10n.dart';
+import 'providers.dart';
+
+Future<void> showFilterSheet(BuildContext context) =>
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const FilterSheet(),
+    );
+
+class FilterSheet extends ConsumerStatefulWidget {
+  const FilterSheet({super.key});
+
+  @override
+  ConsumerState<FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends ConsumerState<FilterSheet> {
+  late MediaFilter _filter = ref.read(settingsProvider).filter;
+
+  void _toggleAlbum(String id, bool selected) {
+    final ids = {..._filter.albumIds};
+    selected ? ids.add(id) : ids.remove(id);
+    setState(() => _filter = _filter.copyWith(albumIds: ids));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final albums = ref.watch(albumsProvider(_filter.type));
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.95,
+      builder: (context, scroll) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SegmentedButton<MediaTypeFilter>(
+              segments: [
+                ButtonSegment(
+                  value: MediaTypeFilter.all,
+                  label: Text(l10n.filterAll),
+                  icon: const Icon(Icons.perm_media_outlined),
+                ),
+                ButtonSegment(
+                  value: MediaTypeFilter.images,
+                  label: Text(l10n.filterImages),
+                  icon: const Icon(Icons.photo_outlined),
+                ),
+                ButtonSegment(
+                  value: MediaTypeFilter.videos,
+                  label: Text(l10n.filterVideos),
+                  icon: const Icon(Icons.videocam_outlined),
+                ),
+              ],
+              selected: {_filter.type},
+              onSelectionChanged: (s) =>
+                  setState(() => _filter = _filter.copyWith(type: s.first)),
+            ),
+          ),
+          CheckboxListTile(
+            value: _filter.albumIds.isEmpty,
+            title: Text(l10n.filterAllAlbums),
+            onChanged: (_) =>
+                setState(() => _filter = _filter.copyWith(albumIds: const {})),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: switch (albums) {
+              AsyncData(:final value) => ListView(
+                controller: scroll,
+                children: [
+                  for (final album in value)
+                    CheckboxListTile(
+                      value: _filter.albumIds.contains(album.id),
+                      title: Text(album.name),
+                      subtitle: Text(l10n.itemCount(album.count)),
+                      onChanged: (v) => _toggleAlbum(album.id, v ?? false),
+                    ),
+                ],
+              ),
+              AsyncError() => Center(child: Text(l10n.loadFailed)),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                onPressed: () {
+                  unawaited(
+                    ref
+                        .read(settingsProvider.notifier)
+                        .update((s) => s.copyWith(filter: _filter)),
+                  );
+                  Navigator.of(context).pop();
+                },
+                child: Text(l10n.filterApply),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
