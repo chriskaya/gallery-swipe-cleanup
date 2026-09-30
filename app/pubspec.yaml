@@ -1,0 +1,48 @@
+name: tamis
+description: "Swipe through your gallery one random item at a time: keep it or send it to the trash."
+# Private application, never published to pub.dev.
+publish_to: 'none'
+
+# versionName+versionCode. Bump deliberately; release automation comes later.
+version: 0.1.0+1
+
+environment:
+  # Matches the pinned Flutter 3.44.4 toolchain (Dart 3.12.2), see
+  # .github/workflows/ci.yml. Bump both together.
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management, same major as ai-reader. The pure-Dart layer under
+  # lib/src/state/ does not import it: providers.dart is the only binding.
+  flutter_riverpod: ^3.4.3
+
+  # MediaStore access: random-access paging, albums, system trash
+  # (createTrashRequest) and restore, MANAGE_MEDIA check/request. Only
+  # lib/src/media/photo_manager_library.dart imports it.
+  photo_manager: ^3.12.0
+
+  # Inline video playback from the MediaStore content:// URI, so a video is
+  # streamed rather than copied to the app cache first.
+  video_player: ^2.14.0
+
+  # App settings and the pending-deletion batch. Small, bounded, and neither
+  # is a credential: nothing here warrants encrypted storage.
+  shared_preferences: ^2.5.5
+
+  # Pinned by flutter_localizations; `any` lets the SDK pick.
+  intl: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  # FR + EN strings, generated from lib/l10n/*.arb (see l10n.yaml).
+  generate: true

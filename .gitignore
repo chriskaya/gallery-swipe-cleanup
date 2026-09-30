@@ -1,0 +1,15 @@
+# Host-specific notes, never published (workspace convention).
+claude.local.md
+
+# Nothing here should ever hold credentials.
+*.env
+!*.env.example
+*.keystore
+*.jks
+key.properties
+
+# OS/editor cruft (app/.gitignore handles the Flutter/Android build outputs).
+.DS_Store
+*.swp
+.idea/
+.vscode/
